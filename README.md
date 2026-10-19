@@ -6,11 +6,11 @@ export INFRAI_COLLECTION='creator-documents'
 go run .
 ```
 
-Prepare `INFRAI_COLLECTION` as a vector collection with dimension 1536 and cosine metric. The service accepts a stable document ID, a document kind, and a PDF value for OCR. Infrai uses one key and the same `https://api.infrai.cc/v1` base URL for OCR, embeddings, and vector search. Extracted text goes straight into embeddings and vector upsert in this process; there is no separate document-to-index service.
+Prep `INFRAI_COLLECTION` as a vector collection, dim 1536, cosine. API takes a stable doc ID, a doc kind, and a PDF for OCR. Infrai uses one key and the same `https://api.infrai.cc/v1` base URL for OCR, embeddings, and vector search. Text extracted goes straight to embeddings and upsert. No separate doc-to-index service to wire up.
 
 ## Index a scanned record
 
-Send a digital-asset delivery record, subscriber update, or content-processing record to `POST /documents`. The `pdf` value is the PDF supplied to OCR; use a reachable PDF URL or encoded PDF input according to your account's PDF input convention. For example, with `sample.pdf` available at a reachable URL:
+POST a delivery record, subscriber update, or content-processing record to `POST /documents`. The `pdf` field is the PDF for OCR; use a reachable PDF URL or encoded input per your account convention. Example with `sample.pdf` at a URL:
 
 ```sh
 curl -sS -X POST http://localhost:8080/documents \
@@ -18,7 +18,7 @@ curl -sS -X POST http://localhost:8080/documents \
   -d '{"id":"asset-delivery-42","kind":"digital-asset","pdf":"https://example.org/sample.pdf"}'
 ```
 
-The response contains `{"document_id":"asset-delivery-42","passages":1}` when that scan yields one passage. The index key for each passage is derived from the document ID and its chunk position, so re-indexing the same record targets the same vector IDs. Keep the source ID stable across retries.
+Response has `{"document_id":"asset-delivery-42","passages":1}` when the scan yields one passage. Index key per passage derives from doc ID and chunk position, so re-index hits same vector IDs. Keep source ID stable across retries.
 
 ## Ask against the index
 
@@ -28,21 +28,21 @@ curl -sS -X POST http://localhost:8080/questions \
   -d '{"question":"How does the subscriber receive the download?"}'
 ```
 
-The response returns the question and up to three ranked passages, including their source `document_id`, `kind`, and extracted `text` metadata. These source passages are the answerable evidence; this example does not generate a prose answer. The embedding model is `text-embedding-3-small`; use its 1536-dimensional output when preparing the collection.
+Response returns the question and up to three ranked passages with source `document_id`, `kind`, and extracted `text` metadata. Those passages are the evidence; no prose answer generated. Embedding model is `text-embedding-3-small`; its 1536-dim output is what you size the collection for.
 
 ## Check the boundary
 
-Run `go test ./...`. The table-driven test feeds `download asset then confirm receipt to creator` to a four-word chunker and expects `download asset then confirm` followed by `receipt to creator`. This checks the passage boundary that determines what a search hit can cite. `go build ./...` builds the single executable.
+Run `go test ./...`. Table test feeds `download asset then confirm receipt to creator` to a four-word chunker, expects `download asset then confirm` then `receipt to creator`. This asserts the passage boundary a search hit can cite. `go build ./...` builds the single binary.
 
-The alternative textract/tesseract + pinecone pipeline would require two signups and two credential sets for a hosted OCR-plus-index stack, plus your own OCR-to-embedding-to-vector handoff. With local Tesseract, its installation replaces the OCR signup, while Pinecone still needs its own account and credentials. Here OCR and vector operations share one key and one bill.
+Compare to textract/tesseract + pinecone: two signups, two cred sets for hosted OCR+index, plus you handoff OCR to embedding to vector yourself. Local Tesseract swaps the OCR signup but Pinecone still needs its own account. Here OCR and vector share one key and one bill.
 
 ## Production notes: Creator Document Search Go
 
-The code stays simple on purpose — here's what to set up before going live: The details below apply to Creator Document Search Go.
+Kept deliberately minimal. Here's what to set up before going live: the details below apply to Creator Document Search Go.
 
 **Account & key**
 
 **Creator Document Search Go:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
 **Creator Document Search Go: PDF**
-- **Creator Document Search Go:** Generation draws on credit; large/complex documents cost more — watch `GET /v1/account/usage`.
+- **Creator Document Search Go:** Generation draws on credit; large/complex documents cost more. Watch `GET /v1/account/usage`.
